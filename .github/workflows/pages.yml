@@ -1,0 +1,65 @@
+name: Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - run: rustup target add wasm32-unknown-unknown
+      - run: node scripts/build-site.mjs # Rust → WebAssembly, страница и version.json с коммитом запуска
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+
+  # Проверка опубликованного: квитанция выпуска (release-receipt с проверкой контрольной суммы) и e2e на живом адресе
+  verify-live:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Квитанция выпуска
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          curl -fsSL -o /tmp/release-receipt.mjs https://github.com/Oleg4311/release-receipt/releases/download/v0.1.0/release-receipt.mjs
+          echo "0fd21b9f9be37f4668ef0272027791e734da56a49b1d81054907aad1b3790892  /tmp/release-receipt.mjs" | sha256sum -c
+          node /tmp/release-receipt.mjs verify https://oleg4311.github.io/wasm-vs-js-filters/ \
+            --sha "${{ github.sha }}" --repo "${{ github.repository }}" --workflow CI \
+            --wait 900 --interval 10 --out receipt.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: receipt
+          path: receipt.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: e2e на живом URL
+        env:
+          BASE_URL: https://oleg4311.github.io/wasm-vs-js-filters/
+        run: npx playwright test --retries=2

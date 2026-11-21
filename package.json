@@ -1,0 +1,20 @@
+{
+  "name": "wasm-vs-js-filters",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Фильтры изображений на Rust (WebAssembly, скаляр и SIMD) и на JavaScript: побайтно одинаковый результат и честный замер",
+  "scripts": {
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "test": "node scripts/build-wasm.mjs && node --test \"test/*.test.js\"",
+    "bench": "node scripts/bench-node.mjs",
+    "site": "node scripts/build-site.mjs",
+    "serve": "node scripts/serve.mjs",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.65.1"
+  }
+}

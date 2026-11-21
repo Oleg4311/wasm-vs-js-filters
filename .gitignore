@@ -1,0 +1,8 @@
+target/
+target-simd/
+node_modules/
+site/
+test-results/
+playwright-report/
+*.log
+dist-wasm/

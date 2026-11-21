@@ -1,0 +1,45 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Версия в Cargo.toml должна совпадать с тегом
+        run: test "v$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)" = "$GITHUB_REF_NAME"
+      - run: rustup target add wasm32-unknown-unknown
+      - run: npm ci
+      - run: cargo test
+      - run: npm test
+      - name: Упаковка
+        run: |
+          name="wasm-vs-js-filters-${GITHUB_REF_NAME}"
+          mkdir -p "dist-pack/$name/js"
+          cp dist-wasm/filters.wasm dist-wasm/filters-simd.wasm README.md LICENSE "dist-pack/$name/"
+          cp js/*.js "dist-pack/$name/js/"
+          tar -C dist-pack -czf "dist-pack/$name.tar.gz" "$name"
+          rm -rf "dist-pack/$name"
+          (cd dist-pack && sha256sum *.tar.gz > SHA256SUMS && cat SHA256SUMS)
+      - name: Подтверждение происхождения (provenance)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: dist-pack/*.tar.gz
+      - name: Публикация релиза
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" dist-pack/*.tar.gz dist-pack/SHA256SUMS
+          --title "wasm-vs-js-filters $GITHUB_REF_NAME"
+          --notes "Два модуля WebAssembly (filters.wasm и filters-simd.wasm) и JS-модули: фильтры, загрузчик, замер. Страница замера: https://oleg4311.github.io/wasm-vs-js-filters/. Проверьте SHA-256 из SHA256SUMS и аттестацию: gh attestation verify <файл> --repo Oleg4311/wasm-vs-js-filters."

@@ -1,0 +1,20 @@
+[package]
+name = "wasm-vs-js-filters"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+description = "Фильтры изображений на Rust (WebAssembly, скаляр и SIMD) и на JavaScript с побайтно одинаковым результатом и честным замером"
+license = "MIT"
+repository = "https://github.com/Oleg4311/wasm-vs-js-filters"
+readme = "README.md"
+
+[lib]
+name = "filters"
+crate-type = ["rlib", "cdylib"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
